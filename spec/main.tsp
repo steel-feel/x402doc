@@ -6,14 +6,14 @@ using TypeSpec.Protobuf;
 
 @TypeSpec.service(#{ title: "X402Docs Services" })
 @package({
-      name: "x402docs.v1",
+      name: "document.v1",
 })
 namespace X402Doc;
 
 // Base model for HTTP API (includes content)
 model Document {
   @field(1) id: string;
-  @field(2) title: int32;
+  @field(2) title: string;
   @field(3) price : int32;
   content: string;
 }
@@ -33,6 +33,8 @@ model ProtoDocumentList {
 
 model HealthStatus {
   status: string;
+  db_status: string;
+  uptime: string;
 }
 
 // HTTP API Interface
@@ -52,12 +54,24 @@ interface HealthHttp {
   @get check(): HealthStatus;
 }
 
+model DocumentResponse {
+  @field(1) id: string;
+  @field(2) title: string;
+  @field(3) content: string;
+  @field(4) priceUsd: int32;
+}
+
+model ListDocumentsReq {}
+
+model ListDocumentsResponse {
+  @field(1) documents: DocumentResponse[];
+}
+
 // gRPC / Protobuf Interface
+@route("/grpc/document")
 @TypeSpec.Protobuf.service
-interface X402DocsProto {
-  /** List documents */
-  list(): ProtoDocumentList;
-  /** Read documents */
-  read(@field(1) id: string): ProtoDocument;
+interface DocumentService {
+  @route("get") getDocument(@field(1) id: string): DocumentResponse;
+  @route("list") listDocuments(@field(1) req: ListDocumentsReq): ListDocumentsResponse;
 }
 

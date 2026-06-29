@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v5"
+	"github.com/steel-feel/prac/api/generated"
 	"github.com/steel-feel/prac/internal/port"
 )
 
@@ -21,5 +22,11 @@ func (h *HealthHandler) Check(c *echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to check health"})
 	}
 
-	return c.JSON(http.StatusOK, status)
+	resp := generated.HealthStatus{
+		Status:   status.Status,
+		DbStatus: status.DBStatus,
+		Uptime:   status.Uptime,
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }

@@ -6,40 +6,6 @@ tags:
   - name: X402Docs
   - name: Health
 paths:
-  /:
-    get:
-      operationId: X402DocsProto_list
-      description: List documents
-      parameters: []
-      responses:
-        '200':
-          description: The request has succeeded.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProtoDocumentList'
-    post:
-      operationId: X402DocsProto_read
-      description: Read documents
-      parameters: []
-      responses:
-        '200':
-          description: The request has succeeded.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProtoDocument'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                id:
-                  type: string
-              required:
-                - id
   /api/v1:
     get:
       operationId: X402DocsHttp_list
@@ -73,6 +39,50 @@ paths:
                 $ref: '#/components/schemas/Document'
       tags:
         - X402Docs
+  /grpc/document/get:
+    post:
+      operationId: DocumentService_getDocument
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+              required:
+                - id
+  /grpc/document/list:
+    post:
+      operationId: DocumentService_listDocuments
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDocumentsResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                req:
+                  $ref: '#/components/schemas/ListDocumentsReq'
+              required:
+                - req
   /health:
     get:
       operationId: HealthHttp_check
@@ -100,8 +110,7 @@ components:
         id:
           type: string
         title:
-          type: integer
-          format: int32
+          type: string
         price:
           type: integer
           format: int32
@@ -116,13 +125,47 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Document'
+    DocumentResponse:
+      type: object
+      required:
+        - id
+        - title
+        - content
+        - priceUsd
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        priceUsd:
+          type: integer
+          format: int32
     HealthStatus:
       type: object
       required:
         - status
+        - db_status
+        - uptime
       properties:
         status:
           type: string
+        db_status:
+          type: string
+        uptime:
+          type: string
+    ListDocumentsReq:
+      type: object
+    ListDocumentsResponse:
+      type: object
+      required:
+        - documents
+      properties:
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentResponse'
     ProtoDocument:
       type: object
       required:
@@ -133,8 +176,7 @@ components:
         id:
           type: string
         title:
-          type: integer
-          format: int32
+          type: string
         price:
           type: integer
           format: int32

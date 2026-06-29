@@ -20,7 +20,7 @@ type Document struct {
 	Content string `json:"content"`
 	Id      string `json:"id"`
 	Price   int32  `json:"price"`
-	Title   int32  `json:"title"`
+	Title   string `json:"title"`
 }
 
 // DocumentList defines model for DocumentList.
@@ -28,46 +28,61 @@ type DocumentList struct {
 	Items []Document `json:"items"`
 }
 
+// DocumentResponse defines model for DocumentResponse.
+type DocumentResponse struct {
+	Content  string `json:"content"`
+	Id       string `json:"id"`
+	PriceUsd int32  `json:"priceUsd"`
+	Title    string `json:"title"`
+}
+
 // HealthStatus defines model for HealthStatus.
 type HealthStatus struct {
-	Status string `json:"status"`
+	DbStatus string `json:"db_status"`
+	Status   string `json:"status"`
+	Uptime   string `json:"uptime"`
 }
 
-// ProtoDocument The template for omitting properties.
-type ProtoDocument struct {
-	Id    string `json:"id"`
-	Price int32  `json:"price"`
-	Title int32  `json:"title"`
+// ListDocumentsReq defines model for ListDocumentsReq.
+type ListDocumentsReq = map[string]interface{}
+
+// ListDocumentsResponse defines model for ListDocumentsResponse.
+type ListDocumentsResponse struct {
+	Documents []DocumentResponse `json:"documents"`
 }
 
-// ProtoDocumentList defines model for ProtoDocumentList.
-type ProtoDocumentList struct {
-	Items []ProtoDocument `json:"items"`
-}
-
-// X402DocsProtoReadJSONBody defines parameters for X402DocsProtoRead.
-type X402DocsProtoReadJSONBody struct {
+// DocumentServiceGetDocumentJSONBody defines parameters for DocumentServiceGetDocument.
+type DocumentServiceGetDocumentJSONBody struct {
 	Id string `json:"id"`
 }
 
-// X402DocsProtoReadJSONRequestBody defines body for X402DocsProtoRead for application/json ContentType.
-type X402DocsProtoReadJSONRequestBody X402DocsProtoReadJSONBody
+// DocumentServiceListDocumentsJSONBody defines parameters for DocumentServiceListDocuments.
+type DocumentServiceListDocumentsJSONBody struct {
+	Req ListDocumentsReq `json:"req"`
+}
+
+// DocumentServiceGetDocumentJSONRequestBody defines body for DocumentServiceGetDocument for application/json ContentType.
+type DocumentServiceGetDocumentJSONRequestBody DocumentServiceGetDocumentJSONBody
+
+// DocumentServiceListDocumentsJSONRequestBody defines body for DocumentServiceListDocuments for application/json ContentType.
+type DocumentServiceListDocumentsJSONRequestBody DocumentServiceListDocumentsJSONBody
 
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"zJVLb9QwEMe/SjRwtDah5ZQj9FAkDohyQEJ7MM7sZsrGNvZspWqV747Geewrhd2+xCWyxuN5/ObveAPG",
-	"Nd5ZtByh3EA0NTY6La+cWTdoWdY+OI+BCdOOcZb7Db73CCVEDmSX0CqgatLsAxmUnYULjWYogSxfXoAa",
-	"XMkyLjGILxOvTvNtFQT8vaaAFZQ/JPdwesioxmLn43H38xYNS6ahxc8UJ9okxmZ/8TbgAkp4k2+h5T2x",
-	"fMTVjol0CPr+uMoUbaqca9Qrrm9Y8zoelxNH+wHdg/i931SCL8Gx251rhdEE8kzOQgnfaswYG7/SjNnC",
-	"hcw1xEx2mW0rmSW0e5j+r4n/s+/nGPY+yMdOXPzILlzi1yGA7++LiytnYnaD4Y4MRlBwhyF2EypmxayQ",
-	"fM6j1Z6ghMtkUuA116nuXD5LnJivdJ5VfdUSWABo2fxU7aROzSVK0kb0zsaO0UVRHFx/7f2KTAqR30ZJ",
-	"MvxCziKYkiUcx4IUkBg5q3XM4toYxAqrWeftXZxo8yvq6tQ2xRe6aWHkD666P6vDE27CsWKnhbB14rDG",
-	"9rXQn4+9VZBrT/ndu6cK7ZrZv7TOniQxBayXUcY2lAzznf7zDVXtgxD2ZPhXBr0IvQ66QcYgGTdAEkRu",
-	"NSiwukm/wUGrW6GoHQ6Hypu/AtfnY1qn1+9BnB9rNL+yzinr37hDqN0DKkiT90vqau+tfjyDLowQ2Bo3",
-	"w7hHQK0abf2Bdt7+CQAA//8=",
+	"xJVRa9swEMe/irnt0dRZuyc/boV1sKd2g8EIQ5WusbrYUqVLoQR/93GypdiJk6Ul7d6MdP7f3e+kv9Yg",
+	"TW1Ngw15KNfgZYW1CJ+XRq5qbIi/rTMWHWkMO9I01G/Qk0UowZPTzQLaHLSaXLZOS+SdO+NqQVCCbuji",
+	"HPIYqhvCBTqOJU1LnFBpc3D4sNIOFZS/OFOMjfp5Km2ehM3tPUpi3djQN+0nmtKE9fjjvcM7KOFdsUFU",
+	"9HyKBKdNiYRz4mm3yqB2qJxr9NY0Hk/H+YdXr4g6VjVINtXeFYolVTckaOV3W1O3v33a2uniwNbKkq6P",
+	"KLmXyAeZ0s9T5fKhiBPx1/gwyLA3aN/cVAx59nFKmv86VpsUu81wrG7uTGihGzD8/Dg7vzTSZzfoHrVE",
+	"pvGIzmvTQAmzs9nZjHMai42wGkq4CEs5WEFVKL8QVhePH/hzgeFMKvTSaUudBrPJNmUFLSd486saFHBF",
+	"ZMMF5H66ZoP8+Wy2deSFtUstg0Jx7zlHtKdjaYY8Ace41O8VZgwTPWWV8JlfSYmoUJ0FziQWnhnHkmHO",
+	"q33/xVqrdi+EaxQqQTjIgCMDXidqJHSccQ2aRRg55NCIOtxWBcPRk1thPuCwfQvmb8D1dEwXzsoi8ip6",
+	"pNZ0/jyGF5P3B/gLppvY80FPn4x6ela3W0+AOsoKp2/ceETtG4xhYxbPHMcE+mV8E49hP7LBk9F3neke",
+	"6nzHpLenwxr/ezzTj8SLZlSFN3Sv23yuUP7JuqAsPXLj0XXPMDtOiH5N2x29+C+3iE6GDWKzuI5umPyj",
+	"zdNa/0M7b/8GAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

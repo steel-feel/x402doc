@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v5"
+	"github.com/steel-feel/prac/api/generated"
 	"github.com/steel-feel/prac/internal/port"
 )
 
@@ -25,5 +26,12 @@ func (h *DocumentHandler) GetDoc(c *echo.Context) error {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "document not found"})
 	}
 
-	return c.JSON(http.StatusOK, doc)
+	resp := generated.Document{
+		Id:      doc.ID,
+		Title:   doc.Title,
+		Content: doc.Content,
+		Price:   doc.PriceUSD,
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }
