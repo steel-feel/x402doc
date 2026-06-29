@@ -16,7 +16,3 @@ type DocumentRepository interface {
 type AccessLogRepository interface {
 	Save(ctx context.Context, log *domain.AccessLog) error
 }
-
-type JokeRepository interface {
-	Joke(ctx context.Context) (string, error)
-}
