@@ -1,19 +1,26 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
 	"github.com/labstack/echo/v5"
-	documentv1 "github.com/steel-feel/prac/proto/document/v1"
-	"github.com/steel-feel/prac/internal/adapter/primary/http/middleware"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/steel-feel/prac/api/generated"
+	mygrpc "github.com/steel-feel/prac/internal/adapter/primary/grpc"
 	myhttp "github.com/steel-feel/prac/internal/adapter/primary/http"
+	"github.com/steel-feel/prac/internal/adapter/primary/http/middleware"
 	"github.com/steel-feel/prac/internal/adapter/secondary/facilitator"
 	"github.com/steel-feel/prac/internal/adapter/secondary/sqlite"
 	"github.com/steel-feel/prac/internal/service"
+	documentv1 "github.com/steel-feel/prac/proto/document/v1"
 )
 
 func setupTestServer(t *testing.T) (*echo.Echo, string) {
@@ -23,6 +30,7 @@ func setupTestServer(t *testing.T) (*echo.Echo, string) {
 	if err != nil {
 		t.Fatalf("failed to init db: %v", err)
 	}
+
 	if err := sqlite.RunMigrations(db.DB, os.DirFS("."), "migrations", "up"); err != nil {
 		t.Fatalf("failed to run migrations: %v", err)
 	}
@@ -106,12 +114,77 @@ func TestDocumentEndpoint_WithPayment(t *testing.T) {
 		t.Error("expected PAYMENT-RESPONSE header")
 	}
 
-	var doc documentv1.DocumentResponse
+	var doc generated.Document
 	if err := json.Unmarshal(rec.Body.Bytes(), &doc); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
 	if doc.Id != "doc-001" {
 		t.Errorf("expected doc-001, got %s", doc.Id)
+	}
+}
+
+func TestGrpcDocumentService(t *testing.T) {
+	// Initialize database
+	dbPath := ":memory:"
+	db, err := sqlite.NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("failed to init db: %v", err)
+	}
+	defer db.Close()
+
+	if err := sqlite.RunMigrations(db.DB, os.DirFS("."), "migrations", "up"); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
+	}
+
+	docRepo := sqlite.NewDocumentRepository(db)
+	docSvc := service.NewDocumentService(docRepo)
+
+	// Create and start gRPC server on a random local port
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+	defer lis.Close()
+
+	s := mygrpc.NewServer(docSvc)
+	go func() {
+		if err := s.Serve(lis); err != nil {
+			// server might stop on close, ignore error
+		}
+	}()
+	defer s.GracefulStop()
+
+	// Connect gRPC client to the server
+	conn, err := grpc.Dial(lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("failed to dial: %v", err)
+	}
+	defer conn.Close()
+
+	client := documentv1.NewDocumentServiceClient(conn)
+
+	// Test ListDocuments
+	listResp, err := client.ListDocuments(context.Background(), &documentv1.ListDocumentsRequest{})
+	if err != nil {
+		t.Fatalf("ListDocuments failed: %v", err)
+	}
+	if len(listResp.Documents) != 2 {
+		t.Errorf("expected 2 documents, got %d", len(listResp.Documents))
+	}
+
+	// Test GetDocument
+	getResp, err := client.GetDocument(context.Background(), &documentv1.GetDocumentRequest{Id: "doc-001"})
+	if err != nil {
+		t.Fatalf("GetDocument failed: %v", err)
+	}
+	if getResp.Id != "doc-001" {
+		t.Errorf("expected doc-001, got %s", getResp.Id)
+	}
+	if getResp.Title != "Getting Started with Tempo" {
+		t.Errorf("expected 'Getting Started with Tempo', got %s", getResp.Title)
+	}
+	if getResp.PriceUsd != 100 {
+		t.Errorf("expected price 100, got %d", getResp.PriceUsd)
 	}
 }

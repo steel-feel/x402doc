@@ -1,0 +1,10 @@
+[
+  {
+    "label": "Run API",
+    "adapter": "Delve",
+    "request": "launch",
+    "mode": "debug",
+    "program": "./cmd/server",
+    "cwd": "${ZED_WORKTREE_ROOT}"
+  }
+]
