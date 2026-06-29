@@ -19,9 +19,12 @@ import (
 func setupTestServer(t *testing.T) (*echo.Echo, string) {
 	// Use an in-memory database for testing
 	dbPath := ":memory:"
-	db, err := sqlite.NewDB(dbPath, os.DirFS("."))
+	db, err := sqlite.NewDB(dbPath)
 	if err != nil {
 		t.Fatalf("failed to init db: %v", err)
+	}
+	if err := sqlite.RunMigrations(db.DB, os.DirFS("."), "migrations", "up"); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
 	}
 
 	fac := facilitator.New(facilitator.Config{})

@@ -24,7 +24,7 @@ func main() {
 	flag.Parse()
 
 	// 1. Initialize Secondary Adapters (Database & Facilitator)
-	db, err := sqlite.NewDB(*dbPath, os.DirFS("."))
+	db, err := sqlite.NewDB(*dbPath)
 	if err != nil {
 		fmt.Printf("failed to initialize database: %v\n", err)
 		os.Exit(1)

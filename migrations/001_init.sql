@@ -1,3 +1,5 @@
+-- +goose Up
+-- +goose StatementBegin
 -- documents table
 CREATE TABLE IF NOT EXISTS documents (
     id TEXT PRIMARY KEY,
@@ -23,3 +25,10 @@ CREATE TABLE IF NOT EXISTS access_logs (
 INSERT OR IGNORE INTO documents (id, title, content, price_usd) VALUES
     ('doc-001', 'Getting Started with Tempo', 'Full guide to Tempo blockchain...', 100),
     ('doc-002', 'TIP-20 Token Standard', 'Deep dive into TIP-20...', 250);
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE IF EXISTS access_logs;
+DROP TABLE IF EXISTS documents;
+-- +goose StatementEnd

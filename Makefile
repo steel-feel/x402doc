@@ -1,7 +1,7 @@
 PORT ?= 9000
 GRPC_PORT ?= 9001
 
-.PHONY: run build test smoke-test proto-gen lint compile
+.PHONY: run migrate build test smoke-test proto-gen lint compile
 
 compile:
 	cd spec && npx tsp compile .
@@ -13,8 +13,12 @@ compile:
 run:
 	go run ./cmd/server/. --port=$(PORT) --grpc-port=$(GRPC_PORT)
 
+migrate:
+	go run ./cmd/migrate/. $(CMD)
+
 build:
 	go build -o bin/server ./cmd/server
+	go build -o bin/migrate ./cmd/migrate
 
 test:
 	go test ./...
