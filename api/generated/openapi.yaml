@@ -1,0 +1,150 @@
+openapi: 3.0.0
+info:
+  title: X402Docs Services
+  version: 0.0.0
+tags:
+  - name: X402Docs
+  - name: Health
+paths:
+  /:
+    get:
+      operationId: X402DocsProto_list
+      description: List documents
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProtoDocumentList'
+    post:
+      operationId: X402DocsProto_read
+      description: Read documents
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProtoDocument'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+              required:
+                - id
+  /api/v1:
+    get:
+      operationId: X402DocsHttp_list
+      description: List documents
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentList'
+      tags:
+        - X402Docs
+  /api/v1/{id}:
+    get:
+      operationId: X402DocsHttp_read
+      description: Read document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+      tags:
+        - X402Docs
+  /health:
+    get:
+      operationId: HealthHttp_check
+      description: Check health status
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+      tags:
+        - Health
+components:
+  schemas:
+    Document:
+      type: object
+      required:
+        - id
+        - title
+        - price
+        - content
+      properties:
+        id:
+          type: string
+        title:
+          type: integer
+          format: int32
+        price:
+          type: integer
+          format: int32
+        content:
+          type: string
+    DocumentList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+    HealthStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+    ProtoDocument:
+      type: object
+      required:
+        - id
+        - title
+        - price
+      properties:
+        id:
+          type: string
+        title:
+          type: integer
+          format: int32
+        price:
+          type: integer
+          format: int32
+      description: The template for omitting properties.
+    ProtoDocumentList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProtoDocument'
