@@ -1,6 +1,6 @@
-# Hexagonal Document Service with REST, gRPC & JWT Auth
+# x402 - Hexagonal Document Service with REST, gRPC & JWT Auth
 
-A Go microservice designed around Hexagonal Architecture (Ports & Adapters) providing REST and gRPC interfaces for document management, payment gating, and market data retrieval.
+This service implements the **X-402 (HTTP 402 Payment Required) Gated Access Protocol** to monetize document. A Go microservice designed around Hexagonal Architecture (Ports & Adapters) providing REST and gRPC interfaces for document management, payment gating, and market data retrieval.
 
 ---
 
@@ -12,6 +12,16 @@ A Go microservice designed around Hexagonal Architecture (Ports & Adapters) prov
 - **gRPC API**: Protocol Buffers and gRPC for high-performance internal calls.
 - **Database**: SQLite with folder-based [Goose](https://github.com/pressly/goose) migrations, separating DDL and DML layers.
 - **Deployment**: Multi-stage Dockerfiles and Docker Compose setups.
+
+---
+
+## X-402 Payment Protocol Integration
+
+1. **Initial Access Request:** A client sends a GET request to `/api/v1/documents/:id` without payment credentials.
+2. **Payment Requirement:** The server intercepts the request and responds with **`402 Payment Required`**, returning details such as the target token contract, payment destination, and price in the response headers.
+3. **On-Chain Settlement:** The client pays the specified amount on-chain (facilitated via the Tempo blockchain network).
+4. **Subsequent Access Request:** The client resends the GET request containing the transaction's signature in the `PAYMENT-SIGNATURE` header.
+5. **Decryption & Delivery:** The server verifies the signature on-chain using the secondary `facilitator` adapter. If valid, the document is returned.
 
 ---
 
