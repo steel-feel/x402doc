@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  db-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["/app/migrate", "--db-path=/app/data/data.db", "up"]
+    volumes:
+      - sqlite-data:/app/data
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["/app/server", "--db-path=/app/data/data.db", "--port=9000", "--grpc-port=9001"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - sqlite-data:/app/data
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+
+volumes:
+  sqlite-data:

@@ -56,3 +56,14 @@ func (r *documentRepo) List(ctx context.Context) ([]*domain.Document, error) {
 
 	return docs, nil
 }
+
+func (r *documentRepo) Create(ctx context.Context, doc *domain.Document) error {
+	_, err := r.db.ExecContext(ctx,
+		"INSERT INTO documents (id, title, content, price_usd, created_at) VALUES (?, ?, ?, ?, ?)",
+		doc.ID, doc.Title, doc.Content, doc.PriceUSD, doc.CreatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert document: %w", err)
+	}
+	return nil
+}

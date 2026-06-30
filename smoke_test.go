@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v5"
@@ -16,7 +17,7 @@ import (
 	"github.com/steel-feel/prac/api/generated"
 	mygrpc "github.com/steel-feel/prac/internal/adapter/primary/grpc"
 	myhttp "github.com/steel-feel/prac/internal/adapter/primary/http"
-	"github.com/steel-feel/prac/internal/adapter/primary/http/middleware"
+	"github.com/steel-feel/prac/internal/adapter/secondary/coinpaprika"
 	"github.com/steel-feel/prac/internal/adapter/secondary/facilitator"
 	"github.com/steel-feel/prac/internal/adapter/secondary/sqlite"
 	"github.com/steel-feel/prac/internal/service"
@@ -41,19 +42,32 @@ func setupTestServer(t *testing.T) (*echo.Echo, string) {
 	docRepo := sqlite.NewDocumentRepository(db)
 	docSvc := service.NewDocumentService(docRepo)
 	accessRepo := sqlite.NewAccessLogRepository(db)
+	
+	userRepo := sqlite.NewUserRepository(db)
+	userSvc := service.NewUserService(userRepo, "test-jwt-secret")
+
+	coinpaprikaURL := os.Getenv("COINPAPRIKA_URL")
+	if coinpaprikaURL == "" {
+		coinpaprikaURL = "https://api.coinpaprika.com"
+	}
+	priceRepo := coinpaprika.NewClient(coinpaprikaURL, nil)
+	priceSvc := service.NewPriceService(priceRepo)
 
 	healthHandler := myhttp.NewHealthHandler(healthSvc)
 	docHandler := myhttp.NewDocumentHandler(docSvc)
+	authHandler := myhttp.NewAuthHandler(userSvc)
+	priceHandler := myhttp.NewPriceHandler(priceSvc)
 
 	e := echo.New()
-	e.Use(middleware.ObservabilityMiddleware())
+	
+	handlers := &myhttp.Handlers{
+		Health:   healthHandler,
+		Document: docHandler,
+		Auth:     authHandler,
+		Price:    priceHandler,
+	}
 
-	api := e.Group("/api/v1")
-	api.GET("/health", healthHandler.Check)
-
-	x402Mw := middleware.X402Middleware(docSvc, fac)
-	accessLogMw := middleware.AccessLogMiddleware(accessRepo)
-	api.GET("/documents/:id", docHandler.GetDoc, x402Mw, accessLogMw)
+	myhttp.RegisterRoutes(e, handlers, fac, docSvc, accessRepo, "test-jwt-secret")
 
 	return e, dbPath
 }
@@ -124,6 +138,105 @@ func TestDocumentEndpoint_WithPayment(t *testing.T) {
 	}
 }
 
+func TestLogin_Success(t *testing.T) {
+	e, _ := setupTestServer(t)
+
+	body := `{"username": "admin", "password": "password"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/login", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp generated.LoginResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp.Token == "" {
+		t.Error("expected non-empty token")
+	}
+}
+
+func TestLogin_InvalidCredentials(t *testing.T) {
+	e, _ := setupTestServer(t)
+
+	body := `{"username": "admin", "password": "wrongpassword"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/login", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d", rec.Code)
+	}
+}
+
+func TestCreateDocument_NoAuth(t *testing.T) {
+	e, _ := setupTestServer(t)
+
+	body := `{"title": "New Doc", "content": "Hello World", "price": 150}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d", rec.Code)
+	}
+}
+
+func TestCreateDocument_Success(t *testing.T) {
+	e, _ := setupTestServer(t)
+
+	// 1. Login to get token
+	body := `{"username": "admin", "password": "password"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/login", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	var loginResp generated.LoginResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &loginResp)
+	token := loginResp.Token
+
+	// 2. Create document using the token
+	docBody := `{"title": "Authenticated Doc", "content": "Super secret auth content", "price": 500}`
+	reqDoc := httptest.NewRequest(http.MethodPost, "/api/v1/documents", strings.NewReader(docBody))
+	reqDoc.Header.Set("Content-Type", "application/json")
+	reqDoc.Header.Set("Authorization", "Bearer "+token)
+	recDoc := httptest.NewRecorder()
+	e.ServeHTTP(recDoc, reqDoc)
+
+	if recDoc.Code != http.StatusCreated {
+		t.Errorf("expected status 201, got %d. Body: %s", recDoc.Code, recDoc.Body.String())
+	}
+
+	var doc generated.Document
+	if err := json.Unmarshal(recDoc.Body.Bytes(), &doc); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if doc.Id == "" {
+		t.Error("expected non-empty document ID")
+	}
+	if doc.Title != "Authenticated Doc" {
+		t.Errorf("expected title 'Authenticated Doc', got '%s'", doc.Title)
+	}
+
+	// 3. Retrieve the created document without payment (should get 402 first)
+	reqGet := httptest.NewRequest(http.MethodGet, "/api/v1/documents/"+doc.Id, nil)
+	recGet := httptest.NewRecorder()
+	e.ServeHTTP(recGet, reqGet)
+
+	if recGet.Code != http.StatusPaymentRequired {
+		t.Errorf("expected status 402 for retrieving doc without payment, got %d", recGet.Code)
+	}
+}
+
 func TestGrpcDocumentService(t *testing.T) {
 	// Initialize database
 	dbPath := ":memory:"
@@ -186,5 +299,38 @@ func TestGrpcDocumentService(t *testing.T) {
 	}
 	if getResp.PriceUsd != 100 {
 		t.Errorf("expected price 100, got %d", getResp.PriceUsd)
+	}
+}
+
+func TestGetEthereumPrice_Integration_Success(t *testing.T) {
+	mockResponse := `{"quotes": {"USD": {"price": 2045.12}}}`
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(mockResponse))
+	}))
+	defer mockServer.Close()
+
+	os.Setenv("COINPAPRIKA_URL", mockServer.URL)
+	defer os.Unsetenv("COINPAPRIKA_URL")
+
+	e, _ := setupTestServer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/price/eth", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp generated.EthereumPriceResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	expectedPrice := 2045.12
+	if resp.Price != expectedPrice {
+		t.Errorf("expected price %f, got %f", expectedPrice, resp.Price)
 	}
 }

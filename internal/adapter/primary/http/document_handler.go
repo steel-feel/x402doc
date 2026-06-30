@@ -35,3 +35,28 @@ func (h *DocumentHandler) GetDoc(c *echo.Context) error {
 
 	return c.JSON(http.StatusOK, resp)
 }
+
+func (h *DocumentHandler) CreateDoc(c *echo.Context) error {
+	var req generated.CreateDocumentRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	}
+
+	if req.Title == "" || req.Content == "" || req.Price <= 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "title, content, and positive price are required"})
+	}
+
+	doc, err := h.service.CreateDocument(c.Request().Context(), req.Title, req.Price, req.Content)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create document"})
+	}
+
+	resp := generated.Document{
+		Id:      doc.ID,
+		Title:   doc.Title,
+		Content: doc.Content,
+		Price:   doc.PriceUSD,
+	}
+
+	return c.JSON(http.StatusCreated, resp)
+}

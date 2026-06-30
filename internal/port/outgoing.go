@@ -10,9 +10,24 @@ import (
 type DocumentRepository interface {
 	FindByID(ctx context.Context, id string) (*domain.Document, error)
 	List(ctx context.Context) ([]*domain.Document, error)
+	Create(ctx context.Context, doc *domain.Document) error
 }
 
 // AccessLogRepository is the secondary port for storing access logs.
 type AccessLogRepository interface {
 	Save(ctx context.Context, log *domain.AccessLog) error
+}
+
+type JokeRepository interface {
+	Joke(ctx context.Context) (string, error)
+}
+
+// UserRepository is the secondary port for user storage.
+type UserRepository interface {
+	FindByUsername(ctx context.Context, username string) (*domain.User, error)
+}
+
+// PriceRepository is the secondary port for fetching market prices.
+type PriceRepository interface {
+	GetEthereumPrice(ctx context.Context) (float64, error)
 }

@@ -15,6 +15,17 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+const (
+	BearerAuthScopes bearerAuthContextKey = "BearerAuth.Scopes"
+)
+
+// CreateDocumentRequest defines model for CreateDocumentRequest.
+type CreateDocumentRequest struct {
+	Content string `json:"content"`
+	Price   int32  `json:"price"`
+	Title   string `json:"title"`
+}
+
 // Document defines model for Document.
 type Document struct {
 	Content string `json:"content"`
@@ -36,6 +47,11 @@ type DocumentResponse struct {
 	Title    string `json:"title"`
 }
 
+// EthereumPriceResponse defines model for EthereumPriceResponse.
+type EthereumPriceResponse struct {
+	Price float64 `json:"price"`
+}
+
 // HealthStatus defines model for HealthStatus.
 type HealthStatus struct {
 	DbStatus string `json:"db_status"`
@@ -51,6 +67,20 @@ type ListDocumentsResponse struct {
 	Documents []DocumentResponse `json:"documents"`
 }
 
+// LoginRequest defines model for LoginRequest.
+type LoginRequest struct {
+	Password string `json:"password"`
+	Username string `json:"username"`
+}
+
+// LoginResponse defines model for LoginResponse.
+type LoginResponse struct {
+	Token string `json:"token"`
+}
+
+// bearerAuthContextKey is the context key for BearerAuth security scheme
+type bearerAuthContextKey string
+
 // DocumentServiceGetDocumentJSONBody defines parameters for DocumentServiceGetDocument.
 type DocumentServiceGetDocumentJSONBody struct {
 	Id string `json:"id"`
@@ -60,6 +90,12 @@ type DocumentServiceGetDocumentJSONBody struct {
 type DocumentServiceListDocumentsJSONBody struct {
 	Req ListDocumentsReq `json:"req"`
 }
+
+// X402DocsHttpCreateJSONRequestBody defines body for X402DocsHttpCreate for application/json ContentType.
+type X402DocsHttpCreateJSONRequestBody = CreateDocumentRequest
+
+// X402DocsHttpLoginJSONRequestBody defines body for X402DocsHttpLogin for application/json ContentType.
+type X402DocsHttpLoginJSONRequestBody = LoginRequest
 
 // DocumentServiceGetDocumentJSONRequestBody defines body for DocumentServiceGetDocument for application/json ContentType.
 type DocumentServiceGetDocumentJSONRequestBody DocumentServiceGetDocumentJSONBody
@@ -72,17 +108,21 @@ type DocumentServiceListDocumentsJSONRequestBody DocumentServiceListDocumentsJSO
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"xJVRa9swEMe/irnt0dRZuyc/boV1sKd2g8EIQ5WusbrYUqVLoQR/93GypdiJk6Ul7d6MdP7f3e+kv9Yg",
-	"TW1Ngw15KNfgZYW1CJ+XRq5qbIi/rTMWHWkMO9I01G/Qk0UowZPTzQLaHLSaXLZOS+SdO+NqQVCCbuji",
-	"HPIYqhvCBTqOJU1LnFBpc3D4sNIOFZS/OFOMjfp5Km2ehM3tPUpi3djQN+0nmtKE9fjjvcM7KOFdsUFU",
-	"9HyKBKdNiYRz4mm3yqB2qJxr9NY0Hk/H+YdXr4g6VjVINtXeFYolVTckaOV3W1O3v33a2uniwNbKkq6P",
-	"KLmXyAeZ0s9T5fKhiBPx1/gwyLA3aN/cVAx59nFKmv86VpsUu81wrG7uTGihGzD8/Dg7vzTSZzfoHrVE",
-	"pvGIzmvTQAmzs9nZjHMai42wGkq4CEs5WEFVKL8QVhePH/hzgeFMKvTSaUudBrPJNmUFLSd486saFHBF",
-	"ZMMF5H66ZoP8+Wy2deSFtUstg0Jx7zlHtKdjaYY8Ace41O8VZgwTPWWV8JlfSYmoUJ0FziQWnhnHkmHO",
-	"q33/xVqrdi+EaxQqQTjIgCMDXidqJHSccQ2aRRg55NCIOtxWBcPRk1thPuCwfQvmb8D1dEwXzsoi8ip6",
-	"pNZ0/jyGF5P3B/gLppvY80FPn4x6ela3W0+AOsoKp2/ceETtG4xhYxbPHMcE+mV8E49hP7LBk9F3neke",
-	"6nzHpLenwxr/ezzTj8SLZlSFN3Sv23yuUP7JuqAsPXLj0XXPMDtOiH5N2x29+C+3iE6GDWKzuI5umPyj",
-	"zdNa/0M7b/8GAAD//w==",
+	"zFfBbuM2EP0Vgu1RiNxsT7p1d9vdFj0UzhYtEBgFTU4sJhbJkKMEhqF/L0iKsmVLjuPaSW8COXozfDPz",
+	"OFxTriujFSh0tFhTx0uoWPj8ZIEhfNa8rkDhFB5rcOg3jNUGLEoIZlwrBBU2cGWAFtShlWpBm4waKzn4",
+	"nTttK4a0oFLhh2uaJVOpEBZgvS1KXMIASpNRC4+1tCBocduaJeiscz/rMPX8Hjh6yBT764KW4q3OIgXN",
+	"TjrQ73IoExKh6n98b+GOFvS7fJPkvM1w3pHTdI6YtWy1H2VAOxTOFJzRysH5eP7TiQtSnaLacjZ0vJ+x",
+	"BAt19Yc3Gj/jfmEIXc+DoxZS1dXcR7sTU/xxyPNXYEssb5Bh7fYdivk/rtva4+/AVm1QVkeQ1UJkW566",
+	"n4fC9eWYasFN4XHLw6jRGJsimby6kDvMlwp642LwMHoh1ajaGebcs7bDpVs7sIodw3BnmW0QDwQzRhbq",
+	"B1BHaGYw28f31QK8thJXN57MCPoRmAX7U41ldyH4n+LypqhLREMbjyHVnQ5BxFakf/84uf6suSM3YJ8k",
+	"B189T2Cd1IoWdHI1uZr4s2kDihlJC/ohLHkqsAwh5MzI/OkH/7mAkAUBjltpMGL4WiKbNAYsy/zmr2Ir",
+	"gK+IJkilpyNyGOCvJ5MdcWLGLCUPCPm902pzFR5bfcFPoKMf6rcSiI3VRErmiKs5BxAgrgL/yBbOpyiF",
+	"TGd+tT1/3msGo90AFfGW7sg4yEW0pbE4wOFHLVZnI2J4XGj6tYi2huYNsnFCJlIn0OK23wO3s2b2UqKW",
+	"vk/HkxTamDxLLEnqfMKUIKn3CWqyACSM/PbXNxLb9WBRB3eXyWNP/944fX25O3c3hfs2h6hrg7ryCyAv",
+	"CZZAeG0tKCRpBiBpPBtPyhfA3sRwSdUZHk3OTdhaimaUqykwcZzseMug7pZVgGBdaDHfL0HxaUbjpRmH",
+	"tH61ZVuE7F5ys/+nkIxwurCGd4Ket5QmueiTl5y39+cX6Aan/9DzO28FcdTMPDAzvIuen1ziA9Qv0+Pp",
+	"GO57U+vZ2LdxRj4ohbsz9W52PMZ7p2d4pj8pR2V48oyqzacS+AOJRqR7k/RTF19NYdDx1pfU394D7XSJ",
+	"iDBeIDaL66SGnX40WbfW/tDMmn8DAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

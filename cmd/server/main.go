@@ -12,15 +12,20 @@ import (
 	"github.com/steel-feel/prac/internal/adapter/primary/http"
 	"github.com/steel-feel/prac/internal/adapter/primary/http/middleware"
 	mygrpc "github.com/steel-feel/prac/internal/adapter/primary/grpc"
+	"github.com/steel-feel/prac/internal/adapter/secondary/coinpaprika"
 	"github.com/steel-feel/prac/internal/adapter/secondary/facilitator"
 	"github.com/steel-feel/prac/internal/adapter/secondary/sqlite"
+	"github.com/steel-feel/prac/internal/config"
 	"github.com/steel-feel/prac/internal/service"
 )
 
 func main() {
+	config.LoadEnv()
+
 	port := flag.String("port", "9000", "port that will be exposed")
 	grpcPort := flag.String("grpc-port", "9001", "port for gRPC server")
 	dbPath := flag.String("db-path", "data.db", "path to sqlite database")
+	jwtSecret := flag.String("jwt-secret", "default-jwt-secret", "Secret key used to sign and verify JWT tokens")
 	flag.Parse()
 
 	// 1. Initialize Secondary Adapters (Database & Facilitator)
@@ -44,13 +49,27 @@ func main() {
 	docRepo := sqlite.NewDocumentRepository(db)
 	docSvc := service.NewDocumentService(docRepo)
 	accessRepo := sqlite.NewAccessLogRepository(db)
+	
+	userRepo := sqlite.NewUserRepository(db)
+	userSvc := service.NewUserService(userRepo, *jwtSecret)
+
+	coinpaprikaURL := os.Getenv("COINPAPRIKA_URL")
+	if coinpaprikaURL == "" {
+		coinpaprikaURL = "https://api.coinpaprika.com"
+	}
+	priceRepo := coinpaprika.NewClient(coinpaprikaURL, nil)
+	priceSvc := service.NewPriceService(priceRepo)
 
 	// 3. Initialize Primary Adapters (HTTP Handlers & gRPC)
 	healthHandler := http.NewHealthHandler(healthSvc)
 	docHandler := http.NewDocumentHandler(docSvc)
+	authHandler := http.NewAuthHandler(userSvc)
+	priceHandler := http.NewPriceHandler(priceSvc)
 	handlers := &http.Handlers{
 		Health:   healthHandler,
 		Document: docHandler,
+		Auth:     authHandler,
+		Price:    priceHandler,
 	}
 	
 	grpcServer := mygrpc.NewServer(docSvc)
@@ -58,7 +77,7 @@ func main() {
 	// 4. Setup Echo and Register Routes
 	e := echo.New()
 	e.Use(middleware.ObservabilityMiddleware())
-	http.RegisterRoutes(e, handlers, fac, docSvc, accessRepo)
+	http.RegisterRoutes(e, handlers, fac, docSvc, accessRepo, *jwtSecret)
 
 	// 5. Start gRPC Server
 	go func() {
