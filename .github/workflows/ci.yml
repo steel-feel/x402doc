@@ -17,7 +17,6 @@ jobs:
       matrix:
         go:
           - "1.26"
-          - "stable"
 
     steps:
       - name: Checkout Code
