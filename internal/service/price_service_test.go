@@ -16,30 +16,48 @@ func (m *mockPriceRepository) GetEthereumPrice(ctx context.Context) (float64, er
 }
 
 func TestPriceService_GetEthereumPrice_Success(t *testing.T) {
-	repo := &mockPriceRepository{
-		price: 1920.45,
-		err:   nil,
-	}
-	svc := NewPriceService(repo)
+	repo1 := &mockPriceRepository{price: 1500.00, err: nil}
+	repo2 := &mockPriceRepository{price: 1600.00, err: nil}
 
+	svc := NewPriceService(repo1, repo2)
 	price, err := svc.GetEthereumPrice(context.Background())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	expectedPrice := 1920.45
-	if price != expectedPrice {
-		t.Errorf("expected price %f, got %f", expectedPrice, price)
+	if price != 1550.00 {
+		t.Errorf("expected price 1550.00, got %v", price)
 	}
 }
 
-func TestPriceService_GetEthereumPrice_Error(t *testing.T) {
-	repo := &mockPriceRepository{
-		price: 0,
-		err:   errors.New("db/network error"),
-	}
-	svc := NewPriceService(repo)
+func TestPriceService_GetEthereumPrice_PartialFailure(t *testing.T) {
+	repo1 := &mockPriceRepository{price: 1500.00, err: nil}
+	repo2 := &mockPriceRepository{price: 0, err: errors.New("provider failed")}
 
+	svc := NewPriceService(repo1, repo2)
+	price, err := svc.GetEthereumPrice(context.Background())
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if price != 1500.00 {
+		t.Errorf("expected price 1500.00, got %v", price)
+	}
+}
+
+func TestPriceService_GetEthereumPrice_TotalFailure(t *testing.T) {
+	repo1 := &mockPriceRepository{price: 0, err: errors.New("provider 1 failed")}
+	repo2 := &mockPriceRepository{price: 0, err: errors.New("provider 2 failed")}
+
+	svc := NewPriceService(repo1, repo2)
+	_, err := svc.GetEthereumPrice(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestPriceService_GetEthereumPrice_NoProviders(t *testing.T) {
+	svc := NewPriceService()
 	_, err := svc.GetEthereumPrice(context.Background())
 	if err == nil {
 		t.Fatal("expected error, got nil")

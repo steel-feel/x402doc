@@ -17,6 +17,7 @@ import (
 	"github.com/steel-feel/prac/api/generated"
 	mygrpc "github.com/steel-feel/prac/internal/adapter/primary/grpc"
 	myhttp "github.com/steel-feel/prac/internal/adapter/primary/http"
+	"github.com/steel-feel/prac/internal/adapter/secondary/coinlore"
 	"github.com/steel-feel/prac/internal/adapter/secondary/coinpaprika"
 	"github.com/steel-feel/prac/internal/adapter/secondary/facilitator"
 	"github.com/steel-feel/prac/internal/adapter/secondary/sqlite"
@@ -50,8 +51,15 @@ func setupTestServer(t *testing.T) (*echo.Echo, string) {
 	if coinpaprikaURL == "" {
 		coinpaprikaURL = "https://api.coinpaprika.com"
 	}
-	priceRepo := coinpaprika.NewClient(coinpaprikaURL, nil)
-	priceSvc := service.NewPriceService(priceRepo)
+	coinpaprikaClient := coinpaprika.NewClient(coinpaprikaURL, nil)
+
+	coinloreURL := os.Getenv("COINLORE_URL")
+	if coinloreURL == "" {
+		coinloreURL = "https://api.coinlore.net"
+	}
+	coinloreClient := coinlore.NewClient(coinloreURL, nil)
+
+	priceSvc := service.NewPriceService(coinpaprikaClient, coinloreClient)
 
 	healthHandler := myhttp.NewHealthHandler(healthSvc)
 	docHandler := myhttp.NewDocumentHandler(docSvc)
@@ -303,16 +311,28 @@ func TestGrpcDocumentService(t *testing.T) {
 }
 
 func TestGetEthereumPrice_Integration_Success(t *testing.T) {
-	mockResponse := `{"quotes": {"USD": {"price": 2045.12}}}`
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockPaprikaResponse := `{"quotes": {"USD": {"price": 2045.12}}}`
+	mockPaprikaServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(mockResponse))
+		w.Write([]byte(mockPaprikaResponse))
 	}))
-	defer mockServer.Close()
+	defer mockPaprikaServer.Close()
 
-	os.Setenv("COINPAPRIKA_URL", mockServer.URL)
-	defer os.Unsetenv("COINPAPRIKA_URL")
+	mockLoreResponse := `[{"price_usd":"2055.12"}]`
+	mockLoreServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(mockLoreResponse))
+	}))
+	defer mockLoreServer.Close()
+
+	os.Setenv("COINPAPRIKA_URL", mockPaprikaServer.URL)
+	os.Setenv("COINLORE_URL", mockLoreServer.URL)
+	defer func() {
+		os.Unsetenv("COINPAPRIKA_URL")
+		os.Unsetenv("COINLORE_URL")
+	}()
 
 	e, _ := setupTestServer(t)
 
@@ -329,7 +349,7 @@ func TestGetEthereumPrice_Integration_Success(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	expectedPrice := 2045.12
+	expectedPrice := 2050.12 // Average of 2045.12 and 2055.12
 	if resp.Price != expectedPrice {
 		t.Errorf("expected price %f, got %f", expectedPrice, resp.Price)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/steel-feel/prac/internal/adapter/primary/http"
 	"github.com/steel-feel/prac/internal/adapter/primary/http/middleware"
 	mygrpc "github.com/steel-feel/prac/internal/adapter/primary/grpc"
+	"github.com/steel-feel/prac/internal/adapter/secondary/coinlore"
 	"github.com/steel-feel/prac/internal/adapter/secondary/coinpaprika"
 	"github.com/steel-feel/prac/internal/adapter/secondary/facilitator"
 	"github.com/steel-feel/prac/internal/adapter/secondary/sqlite"
@@ -57,8 +58,15 @@ func main() {
 	if coinpaprikaURL == "" {
 		coinpaprikaURL = "https://api.coinpaprika.com"
 	}
-	priceRepo := coinpaprika.NewClient(coinpaprikaURL, nil)
-	priceSvc := service.NewPriceService(priceRepo)
+	coinpaprikaClient := coinpaprika.NewClient(coinpaprikaURL, nil)
+
+	coinloreURL := os.Getenv("COINLORE_URL")
+	if coinloreURL == "" {
+		coinloreURL = "https://api.coinlore.net"
+	}
+	coinloreClient := coinlore.NewClient(coinloreURL, nil)
+
+	priceSvc := service.NewPriceService(coinpaprikaClient, coinloreClient)
 
 	// 3. Initialize Primary Adapters (HTTP Handlers & gRPC)
 	healthHandler := http.NewHealthHandler(healthSvc)
